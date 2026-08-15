@@ -1,683 +1,1325 @@
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://pastebin.com/raw/WZNTy8jJ"))()
-local InterfaceManager = loadstring(game:HttpGet("https://pastebin.com/raw/BYLJ6SvY"))()
-local Window = Fluent:CreateWindow({
-    Title = "Be a Lucky Block",
-    SubTitle = "by Squex",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(550, 430),
-    Acrylic = false,
-    Theme = "Darker",
-    MinimizeKey = Enum.KeyCode.LeftControl
-})
-local Tabs = {
-    Main = Window:AddTab({ Title = "Main", Icon = "box" }),
-    Upgrades = Window:AddTab({ Title = "Upgrades", Icon = "gauge" }),
-    Brainrots = Window:AddTab({ Title = "Brainrots", Icon = "bot" }),
-    Stats = Window:AddTab({ Title = "Stats", Icon = "chart-column" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
-}
+--[[
+    Chicken Farm - Auto Farm Script (Mobile Compatible)
+    Game: Chicken Farm by Skandi Studios
+    Version: 3.0
+    Features:
+      Auto Collect (smart sweep+return), Auto Sell/Deposit,
+      Auto Buy Best Tier (100->25->5->1), Auto Upgrade Farm,
+      Auto Merge Chickens, Auto Upgrade Sell Rate,
+      Auto Rebirth, Anti-AFK, Speed Boost,
+      Landscape Scrollable Tab GUI (Farm / Upgrade / Settings),
+      Configurable Delays (live apply), Session Stats, Toasts
+]]
 
+-- ============================================================
+-- SERVICES
+-- ============================================================
+local Players           = game:GetService("Players")
+local UserInputService  = game:GetService("UserInputService")
+local TweenService      = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-
-local Options = Fluent.Options
-do
------
------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local claimGift = ReplicatedStorage
-    :WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_knit@1.7.0")
-    :WaitForChild("knit")
-    :WaitForChild("Services")
-    :WaitForChild("PlaytimeRewardService")
-    :WaitForChild("RF")
-    :WaitForChild("ClaimGift")
-local autoClaiming = false
-local ACPR = Tabs.Main:AddToggle("ACPR", {
-    Title = "Auto Claim Playtime Rewards",
-    Default = false
-})
-ACPR:OnChanged(function(state)
-    autoClaiming = state
-    if not state then return end
-    task.spawn(function()
-        while autoClaiming do
-            for reward = 1, 12 do
-                if not autoClaiming then break end
-                local success, err = pcall(function()
-                    claimGift:InvokeServer(reward)
-                end)
-                task.wait(0.25)
-            end
-            task.wait(1)
-        end
-    end)
-end)
-Options.ACPR:SetValue(false)
------
------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local rebirth = ReplicatedStorage
-    :WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_knit@1.7.0")
-    :WaitForChild("knit")
-    :WaitForChild("Services")
-    :WaitForChild("RebirthService")
-    :WaitForChild("RF")
-    :WaitForChild("Rebirth")
-local running = false
-local AR = Tabs.Main:AddToggle("AR", {
-    Title = "Auto Rebirth",
-    Default = false
-})
-AR:OnChanged(function(state)
-    running = state
-    if not state then return end
-    task.spawn(function()
-        while running do
-            pcall(function()
-                rebirth:InvokeServer()
-            end)
-            task.wait(1)
-        end
-    end)
-end)
-Options.AR:SetValue(false)
------
------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
 local player = Players.LocalPlayer
-local claim = ReplicatedStorage
-    :WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_knit@1.7.0")
-    :WaitForChild("knit")
-    :WaitForChild("Services")
-    :WaitForChild("SeasonPassService")
-    :WaitForChild("RF")
-    :WaitForChild("ClaimPassReward")
-local running = false
-local ACEPR = Tabs.Main:AddToggle("ACEPR", {
-    Title = "Auto Claim Event Pass Rewards",
-    Default = false
-})
-ACEPR:OnChanged(function(state)
-    running = state
-    if not state then return end
-    task.spawn(function()
-        while running do
-            local gui = player:WaitForChild("PlayerGui")
-                :WaitForChild("Windows")
-                :WaitForChild("Event")
-                :WaitForChild("Frame")
-                :WaitForChild("Frame")
-                :WaitForChild("Windows")
-                :WaitForChild("Pass")
-                :WaitForChild("Main")
-                :WaitForChild("ScrollingFrame")
-            for i = 1, 10 do
-                if not running then break end
-                local item = gui:FindFirstChild(tostring(i))
-                if item and item:FindFirstChild("Frame") and item.Frame:FindFirstChild("Free") then
-                    local free = item.Frame.Free
-                    local locked = free:FindFirstChild("Locked")
-                    local claimed = free:FindFirstChild("Claimed")
-                    while running and locked and locked.Visible do
-                        task.wait(0.2)
-                    end
-                    if running and claimed and claimed.Visible then
-                        continue
-                    end
-                    if running and locked and not locked.Visible then
-                        pcall(function()
-                            claim:InvokeServer("Free", i)
-                        end)
-                    end
-                end
-            end
-            task.wait(0.5)
-        end
-    end)
-end)
-Options.ACEPR:SetValue(false)
------
------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local redeem = ReplicatedStorage
-    :WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_knit@1.7.0")
-    :WaitForChild("knit")
-    :WaitForChild("Services")
-    :WaitForChild("CodesService")
-    :WaitForChild("RF")
-    :WaitForChild("RedeemCode")
-local codes = {
-    "release"
-    -- add more codes here
+
+-- ============================================================
+-- CONFIG  (live-editable via Settings tab)
+-- ============================================================
+local CONFIG = {
+    CollectDelay     = 0.1,
+    SellDelay        = 2,
+    BuyDelay         = 2,
+    RebirthDelay     = 8,
+    UpgradeDelay     = 3,
+    MergeDelay       = 1,
+    SellRateDelay    = 3,
+    AntiAFKInterval  = 55,
+    NormalSpeed      = 16,
+    BoostSpeed       = 60,
 }
-Tabs.Main:AddButton({
-    Title = "Redeem All Codes",
-    Callback = function()
-        for _, code in ipairs(codes) do
-            pcall(function()
-                redeem:InvokeServer(code)
-            end)
-            task.wait(1)
-        end
-    end
-})
------
------
-Tabs.Upgrades:AddSection("Speed Upgrades")
------
------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local upgrade = ReplicatedStorage
-    :WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_knit@1.7.0")
-    :WaitForChild("knit")
-    :WaitForChild("Services")
-    :WaitForChild("UpgradesService")
-    :WaitForChild("RF")
-    :WaitForChild("Upgrade")
-local amount = 1
-local delayTime = 0.5
-local running = false
-local IMS = Tabs.Upgrades:AddInput("IMS", {
-    Title = "Speed Amount",
-    Default = "1",
-    Placeholder = "Number",
-    Numeric = true,
-    Finished = false,
-    Callback = function(Value)
-        amount = tonumber(Value) or 1
-    end
-})
-IMS:OnChanged(function(Value)
-    amount = tonumber(Value) or 1
-end)
-local SMS = Tabs.Upgrades:AddSlider("SMS", {
-    Title = "Upgrade Interval",
-    Description = "",
-    Default = 1,
-    Min = 0,
-    Max = 5,
-    Rounding = 1,
-    Callback = function(Value)
-        delayTime = Value
-    end
-})
-SMS:OnChanged(function(Value)
-    delayTime = Value
-end)
-SMS:SetValue(1)
-local AMS = Tabs.Upgrades:AddToggle("AMS", {
-    Title = "Auto Upgrade Speed",
-    Default = false
-})
-AMS:OnChanged(function(state)
-    running = state
-    if not state then return end
-    task.spawn(function()
-        while running do
-            pcall(function()
-                upgrade:InvokeServer("MovementSpeed", amount)
-            end)
-            task.wait(delayTime)
-        end
-    end)
-end)
-Options.AMS:SetValue(false)
------
------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local buy = ReplicatedStorage
-    :WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_knit@1.7.0")
-    :WaitForChild("knit")
-    :WaitForChild("Services")
-    :WaitForChild("SkinService")
-    :WaitForChild("RF")
-    :WaitForChild("BuySkin")
-local skins = {
-    "prestige_mogging_luckyblock",
-    "mogging_luckyblock",
-    "colossus _luckyblock",
-    "inferno_luckyblock",
-    "divine_luckyblock",
-    "spirit_luckyblock",
-    "cyborg_luckyblock",
-    "void_luckyblock",
-    "gliched_luckyblock",
-    "lava_luckyblock",
-    "freezy_luckyblock",
-    "fairy_luckyblock"
+
+-- ============================================================
+-- TOGGLE FLAGS
+-- ============================================================
+local Flags = {
+    AutoCollect      = false,
+    AutoSell         = false,
+    AutoBuy          = false,
+    AutoUpgrade      = false,
+    AutoMerge        = false,
+    AutoSellRate     = false,
+    AutoRebirth      = false,
+    AntiAFK          = false,
+    SpeedBoost       = false,
 }
-local suffix = {
-    K = 1e3,
-    M = 1e6,
-    B = 1e9,
-    T = 1e12,
-    Qa = 1e15,
-    Qi = 1e18,
-    Sx = 1e21,
-    Sp = 1e24,
-    Oc = 1e27,
-    No = 1e30,
-    Dc = 1e33
+
+-- ============================================================
+-- RUNTIME STATS
+-- ============================================================
+local Stats = {
+    EggsCollected   = 0,
+    ChickensBought  = 0,
+    UpgradesDone    = 0,
+    SellsDone       = 0,
+    MergesDone      = 0,
+    SellRateDone    = 0,
 }
-local function parseCash(text)
-    text = text:gsub("%$", ""):gsub(",", ""):gsub("%s+", "")
-    local num = tonumber(text:match("[%d%.]+"))
-    local suf = text:match("%a+")
-    if not num then return 0 end
-    if suf and suffix[suf] then
-        return num * suffix[suf]
-    end
-    return num
+
+-- ============================================================
+-- CORE HELPERS
+-- ============================================================
+local function getRoot()
+    local char = player.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart")
 end
-local running = false
-local ABL = Tabs.Main:AddToggle("ABL", {
-    Title = "Auto Buy Best Luckyblock",
-    Default = false
-})
-ABL:OnChanged(function(state)
-    running = state
-    if not state then return end
-    task.spawn(function()
-        while running do
-            local gui = player.PlayerGui:FindFirstChild("Windows")
-            if not gui then 
-                task.wait(1)
-                continue 
-            end
-            local pickaxeShop = gui:FindFirstChild("PickaxeShop")
-            if not pickaxeShop then 
-                task.wait(1)
-                continue 
-            end
-            local shopContainer = pickaxeShop:FindFirstChild("ShopContainer")
-            if not shopContainer then 
-                task.wait(1)
-                continue 
-            end
-            local scrollingFrame = shopContainer:FindFirstChild("ScrollingFrame")
-            if not scrollingFrame then 
-                task.wait(1)
-                continue 
-            end
-            local cash = player.leaderstats.Cash.Value
-            local bestSkin = nil
-            local bestPrice = 0
-            for i = 1, #skins do
-                local name = skins[i]
-                local item = scrollingFrame:FindFirstChild(name)
-                if item then
-                    local main = item:FindFirstChild("Main")
-                    if main then
-                        local buyFolder = main:FindFirstChild("Buy")
-                        if buyFolder then
-                            local buyButton = buyFolder:FindFirstChild("BuyButton")
-                            if buyButton and buyButton.Visible then
-                                local cashLabel = buyButton:FindFirstChild("Cash")
-                                if cashLabel then
-                                    local price = parseCash(cashLabel.Text)
-                                    if cash >= price and price > bestPrice then
-                                        bestSkin = name
-                                        bestPrice = price
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            if bestSkin then
-                pcall(function()
-                    buy:InvokeServer(bestSkin)
-                end)
-            end
-            task.wait(0.5)
-        end
-    end)
-end)
-Options.ABL:SetValue(false)
------
------
-Tabs.Main:AddButton({
-    Title = "Sell Held Brainrot",
-    Callback = function()
-        Window:Dialog({
-            Title = "Confirm Sale",
-            Content = "Are you sure you want to sell this held Brainrot?",
-            Buttons = {
-                {
-                    Title = "Confirm",
-                    Callback = function()
-                        local player = game:GetService("Players").LocalPlayer
-                        local character = player.Character or player.CharacterAdded:Wait()
-                        local tool = character:FindFirstChildOfClass("Tool")
-                        if not tool then
-                            Fluent:Notify({
-                                Title = "ERROR!",
-                                Content = "Equip the Brainrot you want to Sell",
-                                Duration = 5
-                            })
-                            return
-                        end
-                        local entityId = tool:GetAttribute("EntityId")
-                        if not entityId then return end
-                        local args = {
-                            entityId
-                        }
-                        game:GetService("ReplicatedStorage")
-                            :WaitForChild("Packages")
-                            :WaitForChild("_Index")
-                            :WaitForChild("sleitnick_knit@1.7.0")
-                            :WaitForChild("knit")
-                            :WaitForChild("Services")
-                            :WaitForChild("InventoryService")
-                            :WaitForChild("RF")
-                            :WaitForChild("SellBrainrot")
-                            :InvokeServer(unpack(args))
-                        Fluent:Notify({
-                            Title = "SOLD!",
-                            Content = "Sold: " .. tool.Name,
-                            Duration = 5
-                        })
 
-                    end
-                },
-                {
-                    Title = "Cancel",
-                    Callback = function()
-                    end
-                }
-            }
-        })
+local function getHumanoid()
+    local char = player.Character
+    if not char then return nil end
+    return char:FindFirstChild("Humanoid")
+end
+
+local function tpTo(part)
+    local root = getRoot()
+    if root and part and part.Parent then
+        -- Land ON the surface of the part (center + half-height + character waist height)
+        -- This handles step/platform boxes of any size correctly
+        local surfaceOffset = (part.Size.Y / 2) + 3.2
+        root.CFrame = CFrame.new(part.Position + Vector3.new(0, surfaceOffset, 0))
     end
-})
------
------
-Tabs.Main:AddButton({
-    Title = "Pickup All Your Brainrots",
-    Callback = function()
-        Window:Dialog({
-            Title = "Confirm Pickup!",
-            Content = "Pick up all Brainrots?",
-            Buttons = {
-                {
-                    Title = "Confirm",
-                    Callback = function()
-                        local player = game:GetService("Players").LocalPlayer
-                        local username = player.Name
-                        local plotsFolder = workspace:WaitForChild("Plots")
-                        local myPlot
-                        for i = 1, 5 do
-                            local plot = plotsFolder:FindFirstChild(tostring(i))
-                            if plot and plot:FindFirstChild(tostring(i)) then
-                                local inner = plot[tostring(i)]
-                                for _, v in pairs(inner:GetDescendants()) do
-                                    if v:IsA("BillboardGui") and string.find(v.Name, username) then
-                                        myPlot = inner
-                                        break
-                                    end
-                                end
-                            end
-                            if myPlot then break end
-                        end
-                        if not myPlot then return end
-                        local containers = myPlot:FindFirstChild("Containers")
-                        if not containers then return end
-                        for i = 1, 30 do
-                            local containerFolder = containers:FindFirstChild(tostring(i))
-                            if containerFolder and containerFolder:FindFirstChild(tostring(i)) then
-                                local container = containerFolder[tostring(i)]
-                                local innerModel = container:FindFirstChild("InnerModel")
-                                if innerModel and #innerModel:GetChildren() > 0 then
-                                    local args = {
-                                        tostring(i)
-                                    }
-                                    game:GetService("ReplicatedStorage")
-                                        :WaitForChild("Packages")
-                                        :WaitForChild("_Index")
-                                        :WaitForChild("sleitnick_knit@1.7.0")
-                                        :WaitForChild("knit")
-                                        :WaitForChild("Services")
-                                        :WaitForChild("ContainerService")
-                                        :WaitForChild("RF")
-                                        :WaitForChild("PickupBrainrot")
-                                        :InvokeServer(unpack(args))
-                                    task.wait(0.1)
-                                end
-                            end
-                        end
-                        Fluent:Notify({
-                            Title = "Done!",
-                            Content = "Picked up all Brainrots",
-                            Duration = 5
-                        })
-                    end
-                },
-                {
-                    Title = "Cancel",
-                    Callback = function()
-                    end
-                }
-            }
-        })
+end
+
+local function getPlot()
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return nil end
+    return plots:FindFirstChild(player.Name)
+end
+
+local function getPlotButton(...)
+    local plot = getPlot()
+    if not plot then return nil end
+    local current = plot:FindFirstChild("Buttons")
+    if not current then return nil end
+    for _, seg in ipairs({...}) do
+        current = current:FindFirstChild(seg)
+        if not current then return nil end
     end
-})
------
------
-local storedParts = {}
-local folder = workspace:WaitForChild("BossTouchDetectors")
-local RBTD = Tabs.Brainrots:AddToggle("RBTD", {
-    Title = "Remove Bad Boss Touch Detectors",
-    Description = "will make it so only the last boss can capture you",
-    Default = false
-})
-RBTD:OnChanged(function(state)
-    if state then
-        storedParts = {}
-        for _, obj in ipairs(folder:GetChildren()) do
-            if obj.Name ~= "base14" then
-                table.insert(storedParts, obj)
-                obj.Parent = nil
-            end
-        end
-    else
-        for _, obj in ipairs(storedParts) do
-            if obj then
-                obj.Parent = folder
-            end
-        end
-        storedParts = {}
-    end
-end)
-Options.RBTD:SetValue(false)
------
------
-Tabs.Brainrots:AddButton({
-    Title = "Teleport to End",
-    Callback = function()
-        local modelsFolder = workspace:WaitForChild("RunningModels")
-        local target = workspace:WaitForChild("CollectZones"):WaitForChild("base14")
-        for _, obj in ipairs(modelsFolder:GetChildren()) do
-            if obj:IsA("Model") then
-                if obj.PrimaryPart then
-                    obj:SetPrimaryPartCFrame(target.CFrame)
-                else
-                    local part = obj:FindFirstChildWhichIsA("BasePart")
-                    if part then
-                        part.CFrame = target.CFrame
-                    end
-                end
-            elseif obj:IsA("BasePart") then
-                obj.CFrame = target.CFrame
-            end
-        end
-    end
-})
------
------
-Tabs.Brainrots:AddSection("Farming")
-local running = false
-local AutoFarmToggle = Tabs.Brainrots:AddToggle("AutoFarmToggle", {
-    Title = "Auto Farm Best Brainrots",
-    Default = false
-})
-AutoFarmToggle:OnChanged(function(state)
-    running = state
-    if state then
-        task.spawn(function()
-            while running do
-                local player = game.Players.LocalPlayer
-                local character = player.Character or player.CharacterAdded:Wait()
-                local root = character:WaitForChild("HumanoidRootPart")
-                local humanoid = character:WaitForChild("Humanoid")
-                local userId = player.UserId
-                local modelsFolder = workspace:WaitForChild("RunningModels")
-                local target = workspace:WaitForChild("CollectZones"):WaitForChild("base14")
-                root.CFrame = CFrame.new(715, 39, -2122)
-                task.wait(0.3)
-                humanoid:MoveTo(Vector3.new(710, 39, -2122))
-                local ownedModel = nil
-                repeat
-                    task.wait(0.3)
-                    for _, obj in ipairs(modelsFolder:GetChildren()) do
-                        if obj:IsA("Model") and obj:GetAttribute("OwnerId") == userId then
-                            ownedModel = obj
-                            break
-                        end
-                    end
-                until ownedModel ~= nil or not running
-                if not running then break end
-                if ownedModel.PrimaryPart then
-                    ownedModel:SetPrimaryPartCFrame(target.CFrame)
-                else
-                    local part = ownedModel:FindFirstChildWhichIsA("BasePart")
-                    if part then
-                        part.CFrame = target.CFrame
-                    end
-                end
-                task.wait(0.7)
-                if ownedModel and ownedModel.Parent == modelsFolder then
-                    if ownedModel.PrimaryPart then
-                        ownedModel:SetPrimaryPartCFrame(target.CFrame * CFrame.new(0, -5, 0))
-                    else
-                        local part = ownedModel:FindFirstChildWhichIsA("BasePart")
-                        if part then
-                            part.CFrame = target.CFrame * CFrame.new(0, -5, 0)
-                        end
-                    end
-                end
-                repeat
-                    task.wait(0.3)
-                until not running or (ownedModel == nil or ownedModel.Parent ~= modelsFolder)
-                if not running then break end
-                local oldCharacter = player.Character
-                repeat
-                    task.wait(0.2)
-                until not running or (player.Character ~= oldCharacter and player.Character ~= nil)
-                if not running then break end
-                task.wait(0.4)
-                local newChar = player.Character
-                local newRoot = newChar:WaitForChild("HumanoidRootPart")
-                newRoot.CFrame = CFrame.new(737, 39, -2118)
-                task.wait(2.1)
-            end
-        end)
-    end
-end)
-Options.AutoFarmToggle:SetValue(false)
------
------
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local running = false
-local sliderValue = 1000
-local originalSpeed = nil
-local currentModel = nil
-local function getMyModel()
-    local folder = workspace:FindFirstChild("RunningModels")
-    if not folder then return nil end
-    for _, model in ipairs(folder:GetChildren()) do
-        if model:GetAttribute("OwnerId") == player.UserId then
-            return model
+    if current:IsA("BasePart") then return current end
+    local btn = current:FindFirstChild("Button") or current:FindFirstChild("Hitbox")
+    return btn or current:FindFirstChildOfClass("BasePart")
+end
+
+local function firePaper(action, ...)
+    local paper = ReplicatedStorage:FindFirstChild("Paper")
+    if not paper then return end
+    local remotes = paper:FindFirstChild("Remotes")
+    if not remotes then return end
+    local re = remotes:FindFirstChild("__remoteevent")
+    local rf = remotes:FindFirstChild("__remotefunction")
+    if re then pcall(function(...) re:FireServer(action, ...) end, ...) end
+    if rf then pcall(function(...) rf:InvokeServer(action, ...) end, ...) end
+end
+
+-- Search buttons folder for any part whose name matches keyword
+local function findPlotButtonByKeyword(keyword)
+    local plot = getPlot()
+    if not plot then return nil end
+    local buttons = plot:FindFirstChild("Buttons")
+    if not buttons then return nil end
+    for _, child in ipairs(buttons:GetDescendants()) do
+        if child.Name:lower():find(keyword:lower()) and child:IsA("BasePart") then
+            return child
         end
     end
     return nil
 end
-local function applySpeed()
-    local model = getMyModel()
-    if not model then
-        currentModel = nil
-        return
-    end
-    if model ~= currentModel then
-        currentModel = model
-        originalSpeed = model:GetAttribute("MovementSpeed")
-    end
-    if running then
-        if originalSpeed == nil then
-            originalSpeed = model:GetAttribute("MovementSpeed")
+
+-- ============================================================
+-- FEATURE: AUTO COLLECT EGGS (smart sweep + return to deposit)
+-- ============================================================
+local function autoCollect()
+    local root = getRoot()
+    if not root then return end
+    local eggsFolder = workspace:FindFirstChild("Eggs")
+    if not eggsFolder then return end
+
+    local eggs = eggsFolder:GetChildren()
+    if #eggs == 0 then return end
+
+    for _, egg in ipairs(eggs) do
+        if not Flags.AutoCollect then break end
+        local main = egg:FindFirstChild("Main") or egg:FindFirstChildOfClass("BasePart")
+        if main and main.Parent then
+            root.CFrame = CFrame.new(main.Position + Vector3.new(0, 3, 0))
+            Stats.EggsCollected = Stats.EggsCollected + 1
+            task.wait(0.05)
         end
-        model:SetAttribute("MovementSpeed", sliderValue)
+    end
+
+    -- Return to deposit after sweep
+    if Flags.AutoCollect then
+        local depositHitbox = getPlotButton("DepositEggs", "Hitbox")
+        if depositHitbox then
+            tpTo(depositHitbox)
+            task.wait(0.2)
+        end
     end
 end
+
+-- ============================================================
+-- FEATURE: AUTO SELL / DEPOSIT
+-- Only deposits when egg multiplier on the DepositEggs button is >= MIN_MULT
+-- Exact label path confirmed: DepositEggs > Model > inner > UI > Multi
+-- Text format: "[x2 Eggs]", "[x1 Eggs]", etc.
+-- ============================================================
+local MIN_SELL_MULT = 1.40  -- only deposit when multiplier is this or higher
+
+local function getEggMultiplier()
+    local plot = getPlot()
+    if not plot then return 1 end
+    local buttons = plot:FindFirstChild("Buttons")
+    if not buttons then return 1 end
+    local depModel = buttons:FindFirstChild("DepositEggs")
+    if not depModel then return 1 end
+
+    -- ── Strategy A: use the exact confirmed path ──────────────────────────
+    -- DepositEggs [Model] > Model [Model] > inner [Part] > UI [BillboardGui] > Multi [TextLabel]
+    local innerModel = depModel:FindFirstChild("Model")
+    local inner = innerModel and innerModel:FindFirstChild("inner")
+    local ui = inner and inner:FindFirstChild("UI")
+    local multiLabel = ui and ui:FindFirstChild("Multi")
+
+    local rawText = multiLabel and multiLabel.Text or nil
+
+    -- ── Strategy B: fallback — find any TextLabel named "Multi" inside DepositEggs ─
+    if not rawText then
+        for _, obj in ipairs(depModel:GetDescendants()) do
+            if obj.Name == "Multi" and (obj:IsA("TextLabel") or obj:IsA("TextButton")) then
+                rawText = obj.Text
+                break
+            end
+        end
+    end
+
+    if rawText then
+        -- Text looks like "[x2 Eggs]" or "[x1.5 Eggs]"
+        -- Extract the number after 'x' or 'X'
+        local m = rawText:match("[xX](%d+%.?%d*)")
+        if m then
+            local val = tonumber(m)
+            if val then return val end
+        end
+    end
+
+    -- Could not read — return 1 (will block deposits, which is the safe default)
+    return 1
+end
+
+-- DEBUG: shows live multiplier as a toast — REMOVE this block once confirmed working
+local _lastMultToast = 0
+local function debugMultToast()
+    local now = tick()
+    if now - _lastMultToast > 10 then  -- max once every 10s
+        _lastMultToast = now
+        local m = getEggMultiplier()
+        local col = m >= MIN_SELL_MULT and Color3.fromRGB(80, 210, 100) or Color3.fromRGB(210, 80, 80)
+        showToast("Egg Mult: x" .. tostring(m) .. " (need x" .. tostring(MIN_SELL_MULT) .. "+)", col)
+    end
+end
+
+local function autoSell()
+    -- Gate: only deposit/sell when multiplier is high enough
+    local mult = getEggMultiplier()
+    debugMultToast()  -- TEMP: show live value; remove once confirmed working
+    if mult < MIN_SELL_MULT then
+        return  -- multiplier too low, skip this cycle
+    end
+
+    local depositHitbox = getPlotButton("DepositEggs", "Hitbox")
+    if depositHitbox then tpTo(depositHitbox); task.wait(0.3) end
+
+    local collectBtn = getPlotButton("CollectMoney", "Button")
+    if collectBtn then tpTo(collectBtn); task.wait(0.3) end
+
+    firePaper("Sell")
+    firePaper("SellEggs")
+    firePaper("CollectMoney")
+    Stats.SellsDone = Stats.SellsDone + 1
+
+end
+
+-- ============================================================
+-- FEATURE: LUCKY BLOCK DETECTION & AUTO-OPEN
+-- If the player has a Lucky Block tool (in hand or backpack),
+-- collect money first then open/use the block before buying.
+-- ============================================================
+local LUCKY_KEYWORDS = { "lucky", "luckyblock", "lucky_block", "luckbox", "luck" }
+
+local function findLuckyBlock()
+    local char = player.Character
+    -- Check equipped tools (in character)
+    if char then
+        for _, obj in ipairs(char:GetChildren()) do
+            if obj:IsA("Tool") then
+                local n = obj.Name:lower()
+                for _, kw in ipairs(LUCKY_KEYWORDS) do
+                    if n:find(kw) then return obj end
+                end
+            end
+        end
+    end
+    -- Check backpack
+    local bp = player:FindFirstChild("Backpack")
+    if bp then
+        for _, obj in ipairs(bp:GetChildren()) do
+            if obj:IsA("Tool") then
+                local n = obj.Name:lower()
+                for _, kw in ipairs(LUCKY_KEYWORDS) do
+                    if n:find(kw) then return obj end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function openLuckyBlock(tool)
+    -- 1. Collect money first (good practice before opening)
+    local collectBtn = getPlotButton("CollectMoney", "Button")
+    if collectBtn then tpTo(collectBtn); task.wait(0.4) end
+    firePaper("CollectMoney")
+    task.wait(0.2)
+
+    -- 2. Equip the tool if it's in the backpack
+    local hum = getHumanoid()
+    if hum and tool and tool.Parent ~= player.Character then
+        pcall(function() hum:EquipTool(tool) end)
+        task.wait(0.3)
+    end
+
+    -- 3. Activate the tool (simulates clicking)
+    if tool and tool.Parent then
+        pcall(function() tool:Activate() end)
+        task.wait(0.3)
+    end
+
+    -- 4. Also fire common lucky-block remotes as fallback
+    for _, action in ipairs({
+        "OpenLuckyBlock", "UseLuckyBlock", "LuckyBlock",
+        "OpenBox", "UseBox", "OpenLucky", "UseLucky",
+        "OpenCrate", "UseCrate",
+    }) do
+        firePaper(action)
+        firePaper(action, 1)
+        firePaper(action, true)
+    end
+end
+
+-- ============================================================
+-- FEATURE: AUTO BUY BEST TIER (100 -> 25 -> 5 -> 1)
+-- Checks for Lucky Block first — opens it and skips buying this cycle
+-- ============================================================
+local BUY_TIERS = {
+    { qty = 100, path = { "BuyChickens", "Buy100", "Button" } },
+    { qty = 25,  path = { "BuyChickens", "Buy25",  "Button" } },
+    { qty = 5,   path = { "BuyChickens", "Buy5",   "Button" } },
+    { qty = 1,   path = { "BuyChickens", "Buy1",   "Button" } },
+}
+
+local function autoBuy()
+    -- Priority: if player is holding a Lucky Block, open it first this cycle
+    local luckyTool = findLuckyBlock()
+    if luckyTool then
+        openLuckyBlock(luckyTool)
+        return  -- skip buying chickens this cycle
+    end
+
+    for _, tier in ipairs(BUY_TIERS) do
+        local btn = getPlotButton(table.unpack(tier.path))
+        if btn then
+            tpTo(btn)
+            task.wait(0.2)
+            firePaper("BuyChicken", tier.qty)
+            firePaper("Buy", "Chicken", tier.qty)
+            Stats.ChickensBought = Stats.ChickensBought + tier.qty
+            return
+        end
+    end
+    firePaper("BuyChicken", 1)
+    firePaper("Buy", "Chicken")
+end
+
+-- ============================================================
+-- FEATURE: AUTO UPGRADE FARM
+-- ============================================================
+local UPGRADE_ACTIONS = {
+    "Upgrade", "UpgradeFarm", "UpgradeChicken", "UpgradeCoop",
+    "BuyUpgrade", "FarmUpgrade", "ChickenUpgrade", "PrestigeUpgrade",
+    "Upgrade1", "Upgrade2", "Upgrade3",
+}
+
+local function autoUpgrade()
+    local plot = getPlot()
+    if plot then
+        local buttons = plot:FindFirstChild("Buttons")
+        if buttons then
+            for _, child in ipairs(buttons:GetChildren()) do
+                local n = child.Name:lower()
+                if n:find("upgrade") and not n:find("sell") and not n:find("rate") then
+                    local btn = child:FindFirstChild("Button")
+                             or child:FindFirstChild("Hitbox")
+                             or child:FindFirstChildOfClass("BasePart")
+                    if btn then tpTo(btn); task.wait(0.15) end
+                end
+            end
+        end
+    end
+    for _, action in ipairs(UPGRADE_ACTIONS) do
+        firePaper(action)
+        firePaper(action, 1)
+    end
+    Stats.UpgradesDone = Stats.UpgradesDone + 1
+end
+
+-- ============================================================
+-- FEATURE: AUTO MERGE CHICKENS
+-- Looks for: Merge / MergeChicken / MergeAll buttons in plot
+-- Also fires remote variants
+-- ============================================================
+local MERGE_ACTIONS = {
+    "Merge", "MergeChicken", "MergeChickens", "MergeAll",
+    "AutoMerge", "CombineChicken", "CombineAll",
+}
+
+local function autoMerge()
+    -- Try plot buttons first (keywords: merge, combine)
+    local plot = getPlot()
+    if plot then
+        local buttons = plot:FindFirstChild("Buttons")
+        if buttons then
+            for _, child in ipairs(buttons:GetDescendants()) do
+                local n = child.Name:lower()
+                if (n:find("merge") or n:find("combine")) and child:IsA("BasePart") then
+                    tpTo(child)
+                    task.wait(0.15)
+                end
+            end
+        end
+    end
+
+    -- Also search workspace for merge zones (some games put them in world)
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local n = obj.Name:lower()
+            if n == "mergebutton" or n == "mergehitbox" or n == "mergeall" then
+                tpTo(obj)
+                task.wait(0.1)
+            end
+        end
+    end
+
+    -- Fire known merge remotes
+    for _, action in ipairs(MERGE_ACTIONS) do
+        firePaper(action)
+        firePaper(action, true)
+        firePaper(action, 1)
+    end
+    Stats.MergesDone = Stats.MergesDone + 1
+end
+
+-- ============================================================
+-- FEATURE: AUTO UPGRADE SELL RATE
+-- Strategy 1 (PRIMARY): Scan for any TextLabel/BillboardGui/SurfaceGui
+--   whose text matches "+X per second" — the visual label above the button.
+--   Walk up to find the owning BasePart and teleport to it.
+-- Strategy 2 (FALLBACK): Keyword scan on button names + remote fire.
+-- ============================================================
+local SELLRATE_ACTIONS = {
+    "UpgradeSellRate", "SellRateUpgrade", "UpgradeRate",
+    "IncomeUpgrade", "UpgradeIncome", "MoneyRateUpgrade",
+    "UpgradeMoney", "SellUpgrade", "RateUpgrade",
+    "UpgradeSell", "UpgradeSellRates",
+    "UpgradeSelling", "SellingUpgrade", "UpgradeMoneyRate",
+    "UpgradeEarnings", "EarningsUpgrade",
+    "UpgradePassive", "PassiveUpgrade",
+    "UpgradeProfit", "ProfitUpgrade",
+}
+
+-- Walk up the instance tree from 'inst' to find a BasePart ancestor
+local function findBasePart(inst)
+    local cur = inst
+    for _ = 1, 8 do
+        if not cur then break end
+        if cur:IsA("BasePart") then return cur end
+        cur = cur.Parent
+    end
+    return nil
+end
+
+-- Returns true if a TextLabel/TextButton text looks like "+X per second"
+local function isPerSecondLabel(text)
+    if not text or text == "" then return false end
+    local t = text:lower()
+    return t:find("per second") or t:find("per sec") or t:find("/sec") or t:find("/s")
+        or t:find("per min") or t:find("/min")
+        or (t:find("%+") and (t:find("second") or t:find("income") or t:find("earn")))
+end
+
+local function autoSellRate()
+    local hitParts = {}  -- collect unique BaseParts to visit
+    local seen = {}
+
+    -- ── Strategy 1: find parts with "+X per second" label text ──────────────
+    -- IMPORTANT: only scan the LOCAL player's own plot to avoid visiting other players' plots
+    local plot = getPlot()
+    if not plot then return end  -- no plot found, bail out entirely
+    local searchRoots = { plot }
+
+    for _, root in ipairs(searchRoots) do
+        for _, obj in ipairs(root:GetDescendants()) do
+            local text = nil
+            if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+                text = obj.Text
+            end
+            if text and isPerSecondLabel(text) then
+                local part = findBasePart(obj)
+                if part and not seen[part] then
+                    seen[part] = true
+                    table.insert(hitParts, part)
+                end
+                -- Also try the parent BillboardGui/SurfaceGui's Adornee/Part
+                -- but ONLY if the adornee belongs to our plot
+                local gui = obj.Parent
+                while gui and not (gui:IsA("BillboardGui") or gui:IsA("SurfaceGui")) do
+                    gui = gui.Parent
+                end
+                if gui then
+                    local adornee = (gui:IsA("BillboardGui") and gui.Adornee)
+                              or (gui:IsA("SurfaceGui") and gui.Parent)
+                    if adornee and adornee:IsA("BasePart")
+                       and adornee:IsDescendantOf(plot)   -- ← must be on OUR plot
+                       and not seen[adornee] then
+                        seen[adornee] = true
+                        table.insert(hitParts, adornee)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Visit every found part — wait long enough for the proximity trigger to register
+    if #hitParts > 0 then
+        for _, part in ipairs(hitParts) do
+            if not Flags.AutoSellRate then break end
+            tpTo(part)
+            task.wait(1.5)   -- stay on the step long enough for the server to register
+        end
+    else
+        -- ── Strategy 2: keyword scan on Buttons folder (also plot-scoped) ─────
+        if plot then
+            local buttons = plot:FindFirstChild("Buttons")
+            if buttons then
+                local collectBtn = getPlotButton("CollectMoney", "Button")
+                local collectPos = collectBtn and collectBtn.Position or nil
+                for _, child in ipairs(buttons:GetDescendants()) do
+                    local n = child.Name:lower()
+                    local isSellRate = n:find("sellrate") or n:find("sell_rate")
+                        or n:find("incomeupgrade") or n:find("moneyrate")
+                        or n:find("rateupgrade") or (n:find("rate") and n:find("upg"))
+                        or (n:find("sell") and n:find("upg") and not n:find("egg"))
+                        or n:find("sellupgrade") or n:find("upgradesell")
+                        or n:find("earning") or n:find("passive") or n:find("profit")
+                    if isSellRate and child:IsA("BasePart") then
+                        tpTo(child); task.wait(0.15)
+                    end
+                end
+                -- proximity scan near CollectMoney
+                if collectPos then
+                    for _, child in ipairs(buttons:GetDescendants()) do
+                        if child:IsA("BasePart") then
+                            local dist = (child.Position - collectPos).Magnitude
+                            local n = child.Name:lower()
+                            if dist < 30 and (n:find("upgrade") or n:find("buy") or n:find("rate")) then
+                                tpTo(child); task.wait(0.12)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- ── Always fire known remotes as a belt-and-suspenders approach ──────────
+    for _, action in ipairs(SELLRATE_ACTIONS) do
+        firePaper(action)
+        firePaper(action, 1)
+        firePaper(action, true)
+    end
+    Stats.SellRateDone = Stats.SellRateDone + 1
+end
+
+-- ============================================================
+-- FEATURE: AUTO REBIRTH
+-- ============================================================
+local function autoRebirth()
+    firePaper("Rebirth")
+    firePaper("Prestige")
+    firePaper("DoRebirth")
+    firePaper("Rebirth", true)
+    firePaper("Rebirth", 1)
+end
+
+-- ============================================================
+-- FEATURE: ANTI-AFK
+-- ============================================================
+local VirtualUser
+pcall(function() VirtualUser = game:GetService("VirtualUser") end)
+
+local function antiAFK()
+    local hum = getHumanoid()
+    if hum then hum.Jump = true end
+    if VirtualUser then
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new(0, 0))
+        end)
+    end
+end
+
+-- ============================================================
+-- FEATURE: SPEED BOOST
+-- ============================================================
+local function applySpeed()
+    local hum = getHumanoid()
+    if hum then
+        hum.WalkSpeed = Flags.SpeedBoost and CONFIG.BoostSpeed or CONFIG.NormalSpeed
+    end
+end
+
+player.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid", 10)
+    if hum then task.wait(1); applySpeed() end
+end)
+
+-- ============================================================
+-- MAIN LOOPS
+-- ============================================================
 task.spawn(function()
     while true do
-        if running then
-            applySpeed()
-        end
-        task.wait(0.2)
+        task.wait(CONFIG.CollectDelay)
+        if Flags.AutoCollect then pcall(autoCollect) end
     end
 end)
-local Toggle = Tabs.Stats:AddToggle("MovementToggle", {
-    Title = "Enable Custom Lucky Block Speed",
-    Default = false
-})
-Toggle:OnChanged(function()
-    running = Options.MovementToggle.Value
-    if not running then
-        local model = getMyModel()
-        if model and originalSpeed ~= nil then
-            model:SetAttribute("MovementSpeed", originalSpeed)
-        end
-        originalSpeed = nil
-        currentModel = nil
+
+task.spawn(function()
+    while true do
+        task.wait(CONFIG.SellDelay)
+        if Flags.AutoSell then pcall(autoSell) end
     end
 end)
-local Slider = Tabs.Stats:AddSlider("MovementSlider", {
-    Title = "Lucky Block Speed",
-    Default = 1000,
-    Min = 50,
-    Max = 3000,
-    Rounding = 0
-})
-Slider:OnChanged(function(Value)
-    sliderValue = Value
+
+task.spawn(function()
+    while true do
+        task.wait(CONFIG.BuyDelay)
+        if Flags.AutoBuy then pcall(autoBuy) end
+    end
 end)
------
------
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
-InterfaceManager:SetFolder("FluentScriptHub")
-SaveManager:SetFolder("FluentScriptHub/specific-game")
-InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-SaveManager:BuildConfigSection(Tabs.Settings)
-Window:SelectTab(1)
-SaveManager:LoadAutoloadConfig()
+
+task.spawn(function()
+    while true do
+        task.wait(CONFIG.UpgradeDelay)
+        if Flags.AutoUpgrade then pcall(autoUpgrade) end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(CONFIG.MergeDelay)
+        if Flags.AutoMerge then pcall(autoMerge) end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(CONFIG.SellRateDelay)
+        if Flags.AutoSellRate then pcall(autoSellRate) end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(CONFIG.RebirthDelay)
+        if Flags.AutoRebirth then pcall(autoRebirth) end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(CONFIG.AntiAFKInterval)
+        if Flags.AntiAFK then pcall(antiAFK) end
+    end
+end)
+
+-- ============================================================
+-- GUI  (Landscape, scrollable, fits mobile screen)
+-- ============================================================
+local existing = game.CoreGui:FindFirstChild("CF_Hub")
+if existing then existing:Destroy() end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name           = "CF_Hub"
+ScreenGui.ResetOnSpawn   = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder   = 999
+ScreenGui.Parent         = game.CoreGui
+
+-- Landscape: wide and short so it fits on mobile without overflow
+local WIN_W = 420    -- wider (landscape)
+local WIN_H = 300    -- shorter so it fits vertically
+local TITLE_H = 44
+local TAB_H   = 30
+local STATUS_H= 28
+
+local Window = Instance.new("Frame")
+Window.Name             = "Window"
+Window.Size             = UDim2.new(0, WIN_W, 0, WIN_H)
+Window.Position         = UDim2.new(0.5, -(WIN_W/2), 0, 14)  -- top-center
+Window.BackgroundColor3 = Color3.fromRGB(11, 11, 17)
+Window.BorderSizePixel  = 0
+Window.Active           = true
+Window.ClipsDescendants = true   -- BUG FIX: prevents content showing outside minimized frame
+Window.Parent           = ScreenGui
+Instance.new("UICorner", Window).CornerRadius = UDim.new(0, 12)
+
+local winStroke = Instance.new("UIStroke", Window)
+winStroke.Color        = Color3.fromRGB(255, 195, 0)
+winStroke.Thickness    = 1.5
+winStroke.Transparency = 0.4
+
+local winGrad = Instance.new("UIGradient", Window)
+winGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 32)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 16)),
+})
+winGrad.Rotation = 90
+
+-- ── Title Bar ───────────────────────────────────────────────
+local TitleBar = Instance.new("Frame", Window)
+TitleBar.Size             = UDim2.new(1, 0, 0, TITLE_H)
+TitleBar.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+TitleBar.BorderSizePixel  = 0
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 12)
+
+-- fill lower corners of title bar
+local titleFix = Instance.new("Frame", TitleBar)
+titleFix.Size             = UDim2.new(1, 0, 0, 12)
+titleFix.Position         = UDim2.new(0, 0, 1, -12)
+titleFix.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+titleFix.BorderSizePixel  = 0
+
+local TitleText = Instance.new("TextLabel", TitleBar)
+TitleText.Size               = UDim2.new(0.55, 0, 1, 0)
+TitleText.Position           = UDim2.new(0, 12, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text               = "Chicken Farm  v3"
+TitleText.Font               = Enum.Font.GothamBold
+TitleText.TextSize           = 14
+TitleText.TextColor3         = Color3.fromRGB(255, 205, 30)
+TitleText.TextXAlignment     = Enum.TextXAlignment.Left
+TitleText.TextYAlignment     = Enum.TextYAlignment.Center
+
+-- Status text inside title bar (right side)
+local TitleStatus = Instance.new("TextLabel", TitleBar)
+TitleStatus.Size               = UDim2.new(0.38, 0, 1, 0)
+TitleStatus.Position           = UDim2.new(0.55, 0, 0, 0)
+TitleStatus.BackgroundTransparency = 1
+TitleStatus.Text               = "Idle"
+TitleStatus.Font               = Enum.Font.Gotham
+TitleStatus.TextSize           = 10
+TitleStatus.TextColor3         = Color3.fromRGB(90, 90, 110)
+TitleStatus.TextXAlignment     = Enum.TextXAlignment.Left
+TitleStatus.TextYAlignment     = Enum.TextYAlignment.Center
+TitleStatus.TextWrapped        = true
+
+local MinBtn = Instance.new("TextButton", TitleBar)
+MinBtn.Size             = UDim2.new(0, 24, 0, 24)
+MinBtn.AnchorPoint      = Vector2.new(1, 0.5)
+MinBtn.Position         = UDim2.new(1, -38, 0.5, 0)  -- shifted left to make room for X btn
+MinBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+MinBtn.Text             = "-"
+MinBtn.Font             = Enum.Font.GothamBold
+MinBtn.TextSize         = 15
+MinBtn.TextColor3       = Color3.fromRGB(200, 200, 200)
+MinBtn.BorderSizePixel  = 0
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 5)
+
+local CloseBtn = Instance.new("TextButton", TitleBar)
+CloseBtn.Size             = UDim2.new(0, 24, 0, 24)
+CloseBtn.AnchorPoint      = Vector2.new(1, 0.5)
+CloseBtn.Position         = UDim2.new(1, -10, 0.5, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(175, 40, 40)
+CloseBtn.Text             = "✕"
+CloseBtn.Font             = Enum.Font.GothamBold
+CloseBtn.TextSize         = 13
+CloseBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+CloseBtn.BorderSizePixel  = 0
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 5)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    -- Turn off all features
+    for k in pairs(Flags) do Flags[k] = false end
+    -- Restore normal walk speed
+    local hum = getHumanoid()
+    if hum then hum.WalkSpeed = CONFIG.NormalSpeed end
+    -- Destroy the whole GUI
+    pcall(function() ScreenGui:Destroy() end)
+end)
+
+-- thin separator
+local Sep = Instance.new("Frame", Window)
+Sep.Size             = UDim2.new(1, -20, 0, 1)
+Sep.Position         = UDim2.new(0, 10, 0, TITLE_H)
+Sep.BackgroundColor3 = Color3.fromRGB(38, 38, 58)
+Sep.BorderSizePixel  = 0
+
+-- ── Tab Bar ─────────────────────────────────────────────────
+local TAB_Y = TITLE_H + 1
+
+local TabBar = Instance.new("Frame", Window)
+TabBar.Size             = UDim2.new(1, -16, 0, TAB_H)
+TabBar.Position         = UDim2.new(0, 8, 0, TAB_Y + 4)
+TabBar.BackgroundColor3 = Color3.fromRGB(16, 16, 24)
+TabBar.BorderSizePixel  = 0
+Instance.new("UICorner", TabBar).CornerRadius = UDim.new(0, 8)
+
+local tabLL = Instance.new("UIListLayout", TabBar)
+tabLL.FillDirection = Enum.FillDirection.Horizontal
+tabLL.SortOrder     = Enum.SortOrder.LayoutOrder
+
+local tabButtons = {}
+local tabPages   = {}
+
+local TABS = { "Farm", "Upgrades", "Settings" }
+
+local CONTENT_Y = TAB_Y + TAB_H + 10
+local CONTENT_H = WIN_H - CONTENT_Y - STATUS_H - 6
+
+-- ── Status Bar (thin, bottom) ────────────────────────────────
+local StatusBar = Instance.new("Frame", Window)
+StatusBar.Size             = UDim2.new(1, 0, 0, STATUS_H)
+StatusBar.AnchorPoint      = Vector2.new(0, 1)
+StatusBar.Position         = UDim2.new(0, 0, 1, 0)
+StatusBar.BackgroundColor3 = Color3.fromRGB(16, 16, 26)
+StatusBar.BorderSizePixel  = 0
+Instance.new("UICorner", StatusBar).CornerRadius = UDim.new(0, 12)
+
+local sbFix = Instance.new("Frame", StatusBar)
+sbFix.Size             = UDim2.new(1, 0, 0, 12)
+sbFix.BackgroundColor3 = Color3.fromRGB(16, 16, 26)
+sbFix.BorderSizePixel  = 0
+
+local StatusLabel = Instance.new("TextLabel", StatusBar)
+StatusLabel.Size               = UDim2.new(1, -12, 1, 0)
+StatusLabel.Position           = UDim2.new(0, 10, 0, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text               = "All features OFF"
+StatusLabel.Font               = Enum.Font.Gotham
+StatusLabel.TextSize           = 10
+StatusLabel.TextColor3         = Color3.fromRGB(80, 80, 100)
+StatusLabel.TextXAlignment     = Enum.TextXAlignment.Left
+
+local function refreshStatus()
+    local on = {}
+    if Flags.AutoCollect  then table.insert(on, "Collect")   end
+    if Flags.AutoSell     then table.insert(on, "Sell")      end
+    if Flags.AutoBuy      then table.insert(on, "Buy")       end
+    if Flags.AutoUpgrade  then table.insert(on, "FarmUpg")   end
+    if Flags.AutoMerge    then table.insert(on, "Merge")     end
+    if Flags.AutoSellRate then table.insert(on, "SellRate")  end
+    if Flags.AutoRebirth  then table.insert(on, "Rebirth")   end
+    if Flags.AntiAFK      then table.insert(on, "AFK")       end
+    if Flags.SpeedBoost   then table.insert(on, "Speed")     end
+    if #on == 0 then
+        StatusLabel.Text       = "All features OFF"
+        StatusLabel.TextColor3 = Color3.fromRGB(80, 80, 100)
+        TitleStatus.Text       = "Idle"
+        TitleStatus.TextColor3 = Color3.fromRGB(90, 90, 110)
+    else
+        local txt = table.concat(on, "  ")
+        StatusLabel.Text       = "ON: " .. txt
+        StatusLabel.TextColor3 = Color3.fromRGB(100, 230, 130)
+        TitleStatus.Text       = table.concat(on, " | ")
+        TitleStatus.TextColor3 = Color3.fromRGB(100, 230, 130)
+    end
 end
+
+-- ── Toast helper ─────────────────────────────────────────────
+local function showToast(msg, color)
+    color = color or Color3.fromRGB(85, 215, 105)
+    local t = Instance.new("Frame", ScreenGui)
+    t.Size             = UDim2.new(0, 310, 0, 38)
+    t.AnchorPoint      = Vector2.new(0.5, 1)
+    t.Position         = UDim2.new(0.5, 0, 1, 10)   -- below screen
+    t.BackgroundColor3 = Color3.fromRGB(12, 18, 12)
+    t.BorderSizePixel  = 0
+    t.ZIndex           = 10
+    Instance.new("UICorner", t).CornerRadius = UDim.new(0, 8)
+    local ts = Instance.new("UIStroke", t)
+    ts.Color = color; ts.Thickness = 1.2
+    local tl = Instance.new("TextLabel", t)
+    tl.Size               = UDim2.new(1, -12, 1, 0)
+    tl.Position           = UDim2.new(0, 12, 0, 0)
+    tl.BackgroundTransparency = 1
+    tl.Text               = msg
+    tl.Font               = Enum.Font.GothamBold
+    tl.TextSize           = 11
+    tl.TextColor3         = color
+    tl.TextXAlignment     = Enum.TextXAlignment.Left
+    tl.ZIndex             = 11
+    -- slide up from bottom
+    TweenService:Create(t, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0.5, 0, 1, -48),
+    }):Play()
+    task.delay(2.2, function()
+        TweenService:Create(t, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Position = UDim2.new(0.5, 0, 1, 10),
+        }):Play()
+        task.delay(0.3, function() pcall(function() t:Destroy() end) end)
+    end)
+end
+
+-- ── Page factory (uses ScrollingFrame) ──────────────────────
+local function makePage(name)
+    local clip = Instance.new("Frame", Window)
+    clip.Name                 = "Clip_" .. name
+    clip.Size                 = UDim2.new(1, 0, 0, CONTENT_H)
+    clip.Position             = UDim2.new(0, 0, 0, CONTENT_Y)
+    clip.BackgroundTransparency = 1
+    clip.Visible              = false
+    clip.ClipsDescendants     = true
+
+    local scroll = Instance.new("ScrollingFrame", clip)
+    scroll.Name                  = "Scroll"
+    scroll.Size                  = UDim2.new(1, 0, 1, 0)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel       = 0
+    scroll.ScrollBarThickness    = 3
+    scroll.ScrollBarImageColor3  = Color3.fromRGB(255, 195, 0)
+    scroll.ScrollBarImageTransparency = 0.5
+    scroll.CanvasSize            = UDim2.new(0, 0, 0, 0)  -- auto via UIListLayout
+    scroll.AutomaticCanvasSize   = Enum.AutomaticSize.Y
+    scroll.ElasticBehavior       = Enum.ElasticBehavior.Always
+
+    tabPages[name] = { clip = clip, scroll = scroll }
+    return scroll  -- callers add children to scroll
+end
+
+-- ── Tab switcher ─────────────────────────────────────────────
+local function setTab(name)
+    for tName, pg in pairs(tabPages) do
+        pg.clip.Visible = (tName == name)
+    end
+    for tName, tbtn in pairs(tabButtons) do
+        local active = (tName == name)
+        local ti = TweenInfo.new(0.14, Enum.EasingStyle.Quad)
+        TweenService:Create(tbtn, ti, {
+            BackgroundColor3 = active and Color3.fromRGB(52, 52, 80) or Color3.fromRGB(16, 16, 24),
+            TextColor3       = active and Color3.fromRGB(255, 215, 50) or Color3.fromRGB(100, 100, 125),
+        }):Play()
+    end
+end
+
+local tabW = (WIN_W - 16) / #TABS
+for i, tName in ipairs(TABS) do
+    local tb = Instance.new("TextButton", TabBar)
+    tb.Size             = UDim2.new(0, tabW, 1, 0)
+    tb.BackgroundColor3 = Color3.fromRGB(16, 16, 24)
+    tb.BorderSizePixel  = 0
+    tb.Text             = tName
+    tb.Font             = Enum.Font.GothamSemibold
+    tb.TextSize         = 11
+    tb.TextColor3       = Color3.fromRGB(100, 100, 125)
+    tb.LayoutOrder      = i
+    Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 7)
+    tabButtons[tName] = tb
+    tb.MouseButton1Click:Connect(function() setTab(tName) end)
+end
+
+-- ============================================================
+-- Toggle row factory  (compact for landscape)
+-- ============================================================
+local function makeToggle(parent, data)
+    local row = Instance.new("Frame", parent)
+    row.Name             = "Row_" .. data.flag
+    row.Size             = UDim2.new(1, 0, 0, 38)
+    row.BackgroundColor3 = Color3.fromRGB(19, 19, 30)
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = data.order
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+    local lbl = Instance.new("TextLabel", row)
+    lbl.Size               = UDim2.new(1, -68, 1, 0)
+    lbl.Position           = UDim2.new(0, 12, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text               = data.label
+    lbl.Font               = Enum.Font.Gotham
+    lbl.TextSize           = 12
+    lbl.TextColor3         = Color3.fromRGB(185, 185, 200)
+    lbl.TextXAlignment     = Enum.TextXAlignment.Left
+    lbl.TextYAlignment     = Enum.TextYAlignment.Center
+
+    local pill = Instance.new("Frame", row)
+    pill.Size             = UDim2.new(0, 42, 0, 24)
+    pill.AnchorPoint      = Vector2.new(1, 0.5)
+    pill.Position         = UDim2.new(1, -10, 0.5, 0)
+    pill.BackgroundColor3 = Color3.fromRGB(42, 42, 58)
+    pill.BorderSizePixel  = 0
+    Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
+
+    local dot = Instance.new("Frame", pill)
+    dot.Size             = UDim2.new(0, 18, 0, 18)
+    dot.AnchorPoint      = Vector2.new(0, 0.5)
+    dot.Position         = UDim2.new(0, 3, 0.5, 0)
+    dot.BackgroundColor3 = Color3.fromRGB(130, 130, 150)
+    dot.BorderSizePixel  = 0
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+
+    local btn = Instance.new("TextButton", row)
+    btn.Size               = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text               = ""
+
+    local function setPill(state)
+        local ti = TweenInfo.new(0.16, Enum.EasingStyle.Quad)
+        if state then
+            TweenService:Create(pill, ti, { BackgroundColor3 = Color3.fromRGB(80, 210, 100) }):Play()
+            TweenService:Create(dot,  ti, { Position = UDim2.new(1, -21, 0.5, 0), BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+            TweenService:Create(lbl,  ti, { TextColor3 = Color3.fromRGB(235, 235, 255) }):Play()
+            TweenService:Create(row,  ti, { BackgroundColor3 = Color3.fromRGB(22, 27, 38) }):Play()
+        else
+            TweenService:Create(pill, ti, { BackgroundColor3 = Color3.fromRGB(42, 42, 58) }):Play()
+            TweenService:Create(dot,  ti, { Position = UDim2.new(0, 3, 0.5, 0), BackgroundColor3 = Color3.fromRGB(130, 130, 150) }):Play()
+            TweenService:Create(lbl,  ti, { TextColor3 = Color3.fromRGB(185, 185, 200) }):Play()
+            TweenService:Create(row,  ti, { BackgroundColor3 = Color3.fromRGB(19, 19, 30) }):Play()
+        end
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        Flags[data.flag] = not Flags[data.flag]
+        setPill(Flags[data.flag])
+        refreshStatus()
+        if data.flag == "SpeedBoost" then applySpeed() end
+        if Flags[data.flag] then
+            showToast(data.label .. " ON", Color3.fromRGB(80, 210, 100))
+        else
+            showToast(data.label .. " OFF", Color3.fromRGB(210, 80, 80))
+        end
+    end)
+end
+
+-- ============================================================
+-- Helper: standard scroll page layout setup
+-- ============================================================
+local function addScrollLayout(scroll, padH)
+    padH = padH or 8
+    local layout = Instance.new("UIListLayout", scroll)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding   = UDim.new(0, 5)
+    local pad = Instance.new("UIPadding", scroll)
+    pad.PaddingLeft   = UDim.new(0, padH)
+    pad.PaddingRight  = UDim.new(0, padH)
+    pad.PaddingTop    = UDim.new(0, 5)
+    pad.PaddingBottom = UDim.new(0, 5)
+end
+
+-- ============================================================
+-- PAGE: FARM
+-- ============================================================
+local FarmScroll = makePage("Farm")
+addScrollLayout(FarmScroll)
+
+local FARM_TOGGLES = {
+    { label = "Auto Collect Eggs",      flag = "AutoCollect",  order = 1 },
+    { label = "Auto Sell & Deposit",    flag = "AutoSell",     order = 2 },
+    { label = "Auto Buy Best Tier",     flag = "AutoBuy",      order = 3 },
+    { label = "Auto Merge Chickens",    flag = "AutoMerge",    order = 4 },
+    { label = "Auto Rebirth",           flag = "AutoRebirth",  order = 5 },
+    { label = "Anti-AFK",               flag = "AntiAFK",      order = 6 },
+    { label = "Speed Boost (x3.75)",    flag = "SpeedBoost",   order = 7 },
+}
+
+for _, d in ipairs(FARM_TOGGLES) do makeToggle(FarmScroll, d) end
+
+-- ============================================================
+-- PAGE: UPGRADES
+-- ============================================================
+local UpgScroll = makePage("Upgrades")
+addScrollLayout(UpgScroll)
+
+local UPG_TOGGLES = {
+    { label = "Auto Upgrade Farm",       flag = "AutoUpgrade",  order = 1 },
+    { label = "Auto Upgrade Sell Rate",  flag = "AutoSellRate", order = 2 },
+}
+for _, d in ipairs(UPG_TOGGLES) do makeToggle(UpgScroll, d) end
+
+-- Info card
+local infoCard = Instance.new("Frame", UpgScroll)
+infoCard.Size             = UDim2.new(1, 0, 0, 60)
+infoCard.BackgroundColor3 = Color3.fromRGB(15, 16, 28)
+infoCard.BorderSizePixel  = 0
+infoCard.LayoutOrder      = 3
+Instance.new("UICorner", infoCard).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", infoCard).Color = Color3.fromRGB(55, 55, 100)
+local infoLbl = Instance.new("TextLabel", infoCard)
+infoLbl.Size               = UDim2.new(1, -16, 1, 0)
+infoLbl.Position           = UDim2.new(0, 8, 0, 0)
+infoLbl.BackgroundTransparency = 1
+infoLbl.Text               = "Sell Rate Upgrade: scans buttons near CollectMoney platform + fires UpgradeSellRate remotes. Farm Upgrade: scans all plot Upgrade buttons + fires upgrade remotes."
+infoLbl.Font               = Enum.Font.Gotham
+infoLbl.TextSize           = 10
+infoLbl.TextColor3         = Color3.fromRGB(120, 120, 155)
+infoLbl.TextXAlignment     = Enum.TextXAlignment.Left
+infoLbl.TextYAlignment     = Enum.TextYAlignment.Center
+infoLbl.TextWrapped        = true
+
+-- Stats card
+local statsCard = Instance.new("Frame", UpgScroll)
+statsCard.Size             = UDim2.new(1, 0, 0, 118)
+statsCard.BackgroundColor3 = Color3.fromRGB(13, 14, 24)
+statsCard.BorderSizePixel  = 0
+statsCard.LayoutOrder      = 4
+Instance.new("UICorner", statsCard).CornerRadius = UDim.new(0, 8)
+local statsStroke = Instance.new("UIStroke", statsCard)
+statsStroke.Color = Color3.fromRGB(255, 195, 0)
+statsStroke.Thickness = 1
+statsStroke.Transparency = 0.55
+
+local stTitle = Instance.new("TextLabel", statsCard)
+stTitle.Size               = UDim2.new(1, -12, 0, 22)
+stTitle.Position           = UDim2.new(0, 10, 0, 4)
+stTitle.BackgroundTransparency = 1
+stTitle.Text               = "Session Stats"
+stTitle.Font               = Enum.Font.GothamBold
+stTitle.TextSize           = 11
+stTitle.TextColor3         = Color3.fromRGB(255, 205, 30)
+stTitle.TextXAlignment     = Enum.TextXAlignment.Left
+
+local stSep = Instance.new("Frame", statsCard)
+stSep.Size             = UDim2.new(1, -18, 0, 1)
+stSep.Position         = UDim2.new(0, 9, 0, 26)
+stSep.BackgroundColor3 = Color3.fromRGB(38, 38, 60)
+stSep.BorderSizePixel  = 0
+
+-- 6 stats in 2 columns
+local STAT_GRID = {
+    { key = "EggsCollected",  label = "Eggs",      col = 0 },
+    { key = "ChickensBought", label = "Chickens",  col = 1 },
+    { key = "UpgradesDone",   label = "FarmUpg",   col = 0 },
+    { key = "SellRateDone",   label = "SellRate",  col = 1 },
+    { key = "MergesDone",     label = "Merges",    col = 0 },
+    { key = "SellsDone",      label = "Sells",     col = 1 },
+}
+local statValueLabels = {}
+local rowY = 30
+local col0x, col1x = 10, 210
+local rowH = 18
+local colCount = { [0] = 0, [1] = 0 }
+
+for _, sr in ipairs(STAT_GRID) do
+    local cx = sr.col == 0 and col0x or col1x
+    local y  = rowY + colCount[sr.col] * (rowH + 2)
+    colCount[sr.col] = colCount[sr.col] + 1
+
+    local lName = Instance.new("TextLabel", statsCard)
+    lName.Size = UDim2.new(0, 90, 0, rowH)
+    lName.Position = UDim2.new(0, cx, 0, y)
+    lName.BackgroundTransparency = 1
+    lName.Text = sr.label .. ":"
+    lName.Font = Enum.Font.Gotham
+    lName.TextSize = 10
+    lName.TextColor3 = Color3.fromRGB(130, 130, 158)
+    lName.TextXAlignment = Enum.TextXAlignment.Left
+
+    local lVal = Instance.new("TextLabel", statsCard)
+    lVal.Size = UDim2.new(0, 80, 0, rowH)
+    lVal.Position = UDim2.new(0, cx + 88, 0, y)
+    lVal.BackgroundTransparency = 1
+    lVal.Text = "0"
+    lVal.Font = Enum.Font.GothamBold
+    lVal.TextSize = 11
+    lVal.TextColor3 = Color3.fromRGB(95, 225, 120)
+    lVal.TextXAlignment = Enum.TextXAlignment.Left
+
+    statValueLabels[sr.key] = lVal
+end
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        for key, lbl in pairs(statValueLabels) do
+            lbl.Text = tostring(Stats[key])
+        end
+    end
+end)
+
+-- ============================================================
+-- PAGE: SETTINGS
+-- ============================================================
+local SetScroll = makePage("Settings")
+addScrollLayout(SetScroll)
+
+local setHeader = Instance.new("TextLabel", SetScroll)
+setHeader.Size               = UDim2.new(1, 0, 0, 18)
+setHeader.BackgroundTransparency = 1
+setHeader.Text               = "Edit value, press [v] to apply live"
+setHeader.Font               = Enum.Font.Gotham
+setHeader.TextSize           = 10
+setHeader.TextColor3         = Color3.fromRGB(100, 100, 135)
+setHeader.TextXAlignment     = Enum.TextXAlignment.Left
+setHeader.LayoutOrder        = 0
+
+local SETTING_ROWS = {
+    { key = "CollectDelay",   label = "Collect Delay (s)",    order = 1, min = 0.05, max = 5   },
+    { key = "SellDelay",      label = "Sell Delay (s)",       order = 2, min = 0.5,  max = 15  },
+    { key = "BuyDelay",       label = "Buy Delay (s)",        order = 3, min = 0.5,  max = 15  },
+    { key = "UpgradeDelay",   label = "Upgrade Delay (s)",    order = 4, min = 0.5,  max = 30  },
+    { key = "MergeDelay",     label = "Merge Delay (s)",      order = 5, min = 0.2,  max = 10  },
+    { key = "SellRateDelay",  label = "Sell Rate Delay (s)",  order = 6, min = 0.5,  max = 30  },
+    { key = "RebirthDelay",   label = "Rebirth Delay (s)",    order = 7, min = 1,    max = 60  },
+    { key = "BoostSpeed",     label = "Boost Speed",          order = 8, min = 16,   max = 200 },
+}
+
+local function makeSettingRow(data)
+    local row = Instance.new("Frame", SetScroll)
+    row.Name             = "Set_" .. data.key
+    row.Size             = UDim2.new(1, 0, 0, 38)
+    row.BackgroundColor3 = Color3.fromRGB(17, 17, 28)
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = data.order
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+
+    local nameLbl = Instance.new("TextLabel", row)
+    nameLbl.Size               = UDim2.new(0.55, 0, 0.55, 0)
+    nameLbl.Position           = UDim2.new(0, 10, 0, 4)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Text               = data.label
+    nameLbl.Font               = Enum.Font.Gotham
+    nameLbl.TextSize           = 11
+    nameLbl.TextColor3         = Color3.fromRGB(185, 185, 205)
+    nameLbl.TextXAlignment     = Enum.TextXAlignment.Left
+
+    local curLbl = Instance.new("TextLabel", row)
+    curLbl.Size               = UDim2.new(0.55, 0, 0.4, 0)
+    curLbl.Position           = UDim2.new(0, 10, 0.55, 0)
+    curLbl.BackgroundTransparency = 1
+    curLbl.Text               = "Now: " .. tostring(CONFIG[data.key])
+    curLbl.Font               = Enum.Font.Gotham
+    curLbl.TextSize           = 9
+    curLbl.TextColor3         = Color3.fromRGB(85, 85, 115)
+    curLbl.TextXAlignment     = Enum.TextXAlignment.Left
+
+    local input = Instance.new("TextBox", row)
+    input.Size               = UDim2.new(0, 55, 0, 24)
+    input.AnchorPoint        = Vector2.new(1, 0.5)
+    input.Position           = UDim2.new(1, -42, 0.5, 0)
+    input.BackgroundColor3   = Color3.fromRGB(25, 25, 40)
+    input.BorderSizePixel    = 0
+    input.Text               = tostring(CONFIG[data.key])
+    input.Font               = Enum.Font.GothamSemibold
+    input.TextSize           = 11
+    input.TextColor3         = Color3.fromRGB(215, 215, 235)
+    input.ClearTextOnFocus   = false
+    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 5)
+    local inpS = Instance.new("UIStroke", input)
+    inpS.Color = Color3.fromRGB(55, 55, 85); inpS.Thickness = 1
+
+    local applyBtn = Instance.new("TextButton", row)
+    applyBtn.Size             = UDim2.new(0, 26, 0, 24)
+    applyBtn.AnchorPoint      = Vector2.new(1, 0.5)
+    applyBtn.Position         = UDim2.new(1, -10, 0.5, 0)
+    applyBtn.BackgroundColor3 = Color3.fromRGB(45, 170, 75)
+    applyBtn.BorderSizePixel  = 0
+    applyBtn.Text             = "v"
+    applyBtn.Font             = Enum.Font.GothamBold
+    applyBtn.TextSize         = 13
+    applyBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", applyBtn).CornerRadius = UDim.new(0, 5)
+
+    applyBtn.MouseButton1Click:Connect(function()
+        local v = tonumber(input.Text)
+        if v then
+            v = math.clamp(v, data.min, data.max)
+            CONFIG[data.key] = v
+            input.Text = tostring(v)
+            curLbl.Text = "Now: " .. tostring(v)
+            if data.key == "BoostSpeed" then applySpeed() end
+            TweenService:Create(applyBtn, TweenInfo.new(0.1), { BackgroundColor3 = Color3.fromRGB(90, 240, 120) }):Play()
+            task.delay(0.4, function()
+                TweenService:Create(applyBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(45, 170, 75) }):Play()
+            end)
+            showToast(data.label .. " = " .. tostring(v), Color3.fromRGB(100, 195, 255))
+        else
+            TweenService:Create(applyBtn, TweenInfo.new(0.1), { BackgroundColor3 = Color3.fromRGB(210, 65, 65) }):Play()
+            task.delay(0.4, function()
+                TweenService:Create(applyBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(45, 170, 75) }):Play()
+            end)
+        end
+    end)
+end
+
+for _, d in ipairs(SETTING_ROWS) do makeSettingRow(d) end
+
+-- activate first tab
+setTab("Farm")
+
+-- ============================================================
+-- DRAG (title bar)
+-- ============================================================
+local dragging, dragStart, startPos
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging  = true
+        dragStart = input.Position
+        startPos  = Window.Position
+    end
+end)
+TitleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement or
+        input.UserInputType == Enum.UserInputType.Touch
+    ) then
+        local d = input.Position - dragStart
+        Window.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + d.X,
+            startPos.Y.Scale, startPos.Y.Offset + d.Y
+        )
+    end
+end)
+
+-- ============================================================
+-- MINIMIZE
+-- ============================================================
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    TweenService:Create(Window, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+        Size = minimized
+            and UDim2.new(0, WIN_W, 0, TITLE_H)
+            or  UDim2.new(0, WIN_W, 0, WIN_H),
+    }):Play()
+    MinBtn.Text = minimized and "+" or "-"
+end)
+
+-- ============================================================
+-- STARTUP
+-- ============================================================
+showToast("Chicken Farm v3.0 Loaded!", Color3.fromRGB(255, 205, 30))
+print("[ChickenFarm v3] Loaded! Farm | Upgrades | Settings")
